@@ -1,4 +1,4 @@
-
+# import telecom dataset into a pandas data frame
 import math
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -12,7 +12,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, classification_report, mutual_info_score
 from sklearn.svm import SVC
 from sklearn.metrics import confusion_matrix
-import re
+import re as regex
 
 
 # Data Reading
@@ -68,8 +68,8 @@ print('Columns  : ', df.shape[1])
 print('\nFeatures : \n', df.columns.tolist())
 print('\nMissing values :  ', df.isnull().sum().values.sum())
 print('\nUnique values :  \n', df.nunique())
-print(df.info())
-print(df.isnull().sum())
+df.info()
+df.isnull().sum()
 
 # drop the customerID column from the dataset as this is not required
 print(df.drop(columns='customerID', inplace=True))
@@ -78,23 +78,14 @@ print(df.drop(columns='customerID', inplace=True))
 print(df.PaymentMethod.unique())
 
 # Applying Regex to remove (automatic) from payment method names
-df['PaymentMethod'] = df['PaymentMethod'].str.replace(' (automatic)', '', regex=True)
-
+df['PaymentMethod'] = df['PaymentMethod'].str.replace(' (automatic)', '', regex=False)
 
 # Replace values for SeniorCitizen as a categorical feature
-df['SeniorCitizen'] = df['SeniorCitizen'].replace({'1': 'Yes', '0': 'No'})
+df['SeniorCitizen'] = df['SeniorCitizen'].replace({1: 'Yes', 0: 'No'})
 
 # Data Visualisation
-num_cols = ['tenure', 'MonthlyCharges', 'TotalCharges']
-df[num_cols].describe()
 sns.set(style='whitegrid')
-sns.pairplot(df[['tenure', 'MonthlyCharges', 'TotalCharges', 'Churn']], hue='Churn', plot_kws=dict(alpha=.3, edgecolor='none'), height=2, aspect=1.1)
-
-
-fig, ax = plt.subplots(1, 3, figsize=(15, 3))
-df[df.Churn == 'No'][num_cols].hist(bins=35, color='blue', alpha=0.5, ax=ax)
-df[df.Churn == 'Yes'][num_cols].hist(bins=35, color='orange', alpha=0.7, ax=ax)
-plt.legend(['No Churn', 'Churn'], shadow=True, loc=9)
+sns.pairplot(df[['tenure', 'MonthlyCharges', 'TotalCharges', 'Churn']], hue='Churn', plot_kws=dict(alpha=.3), height=2, aspect=1.1)
 
 # Create a figure
 fig = plt.figure(figsize=(10, 6))
@@ -122,6 +113,7 @@ spine_names = ('top', 'right', 'bottom', 'left')
 for spine_name in spine_names:
     ax.spines[spine_name].set_visible(False)
     plt.show()
+sns.displot()
 
 # unique elements of the PaymentMethod column after the modification
 print(df.PaymentMethod.unique())
