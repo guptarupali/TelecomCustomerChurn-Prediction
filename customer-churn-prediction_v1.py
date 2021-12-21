@@ -1,31 +1,105 @@
-# import telecom dataset into a pandas data frame
+# *********************** Customer Attrition Prediction Project ***********************************
+# **********************Data Preprocessing*********************************
+
+# Step 1: Import relevant libraries:
+
+# Standard libraries for data analysis:
 import math
 import pandas as pd
+import numpy as np
+
+# Standard libraries for data visualisation:
 import matplotlib.pyplot as plt
 import seaborn as sns
-import numpy as np
+
+# Regex & time
+import re
+import time
+
+# sklearn modules for data preprocessing:
+from sklearn.model_selection import train_test_split
+
+# sklearn modules for Model Selection:
 from sklearn.dummy import DummyClassifier
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
-from sklearn.model_selection import train_test_split, RandomizedSearchCV
+from sklearn.model_selection import RandomizedSearchCV
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score, classification_report, mutual_info_score
-from sklearn.svm import SVC
-from sklearn.metrics import confusion_matrix
-import re as regex
+from sklearn.naive_bayes import GaussianNB
 
+
+
+# sklearn modules for Model Evaluation & Improvement:
+from sklearn.metrics import confusion_matrix, accuracy_score
+from sklearn.svm import SVC
+from sklearn.metrics import accuracy_score, classification_report, mutual_info_score
 
 # Data Reading
+from sklearn.tree import DecisionTreeClassifier
+
+# Step 2: Import the dataset:
+
 df = pd.read_csv('customer-churn-data.csv')
 
-# Exploratory Data Analysis and Data Cleaning
+
+#  Data Preprocessing - Evaluate data structure:
 
 #  Retrieving data heads
-print(df.head)
-
+print(df.head())
+#  Retrieving data shape
+print(df.shape)
 # Retrieving data columns
 print(df.columns)
 
+
+# summary of the data frame
+# only 3 feature contain numerical values, rest are categorical feature
+print(df.describe())
+print(df.dtypes)
+
+
+# summary of the data frame
+print(df.info())
+
+#*******************Data Preprocessing****************
+
+# Data Cleaning, Missing values and data types
+# Transform the column TotalCharges into a numeric data type
+df['TotalCharges'] = pd.to_numeric(df['TotalCharges'], errors='coerce')
+
+df.isnull().sum()
+# Null observations of the TotalCharges column
+print(df[df['TotalCharges'].isnull()])
+
+# Drop observations with null values- use of Regex
+df['TotalCharges'] = df['TotalCharges'].replace(' ', np.nan)
+print(df.dropna(inplace=True))
+
+# data overview
+print('Rows     : ', df.shape[0])
+print('Columns  : ', df.shape[1])
+print('\nFeatures : \n', df.columns.tolist())
+print('\nMissing values :  ', df.isnull().sum().values.sum())
+print('\nUnique values :  \n', df.nunique())
+print(df.info())
+
+print(df.isnull().any())
+print("\n# of Null values in 'TotalCharges`: ", df["TotalCharges"].isnull().sum())
+
+# drop the customerID column from the dataset as this is not required
+print(df.drop(columns='customerID', inplace=True))
+
+# unique elements of the PaymentMethod column
+print(df.PaymentMethod.unique())
+
+# Applying Regex to remove (automatic) from payment method names
+df['PaymentMethod'] = df['PaymentMethod'].apply(lambda x: re.sub(' (automatic)', ' ', x))
+
+# Replace values for SeniorCitizen as a categorical feature
+df['SeniorCitizen'] = df['SeniorCitizen'].replace({'1': 'Yes', '0': 'No'})
+
+# Data Visualisation
+# To analyse categorical feature distribution
 # Quantitative features:
 features = ['MonthlyCharges', 'tenure']
 df[features].hist(figsize=(10, 4))
@@ -38,54 +112,63 @@ sns.distplot(x)
 
 # Box plot
 
-sns.boxplot(x='MonthlyCharges', data=df);
+_, axes = plt.subplots(1, 2, sharey=True, figsize=(10, 4))
+sns.boxplot(x='Churn', y='MonthlyCharges', data=df, ax=axes[0])
 
 # Violin plot
+sns.violinplot(x='Churn', y='MonthlyCharges', data=df, ax=axes[1])
 
-_, axes = plt.subplots(1, 2, sharey=True, figsize=(6, 4))
-sns.boxplot(data=df['MonthlyCharges'], ax=axes[0])
-sns.violinplot(data=df['MonthlyCharges'], ax=axes[1])
 
-# summary of the data frame
-print(df.info())
-
-# Data Cleaning, Missing values and data types
-# Transform the column TotalCharges into a numeric data type
-df['TotalCharges'] = pd.to_numeric(df['TotalCharges'], errors='coerce')
-
-df.isnull().sum()
-# Null observations of the TotalCharges column
-print(df[df['TotalCharges'].isnull()])
-
-# Drop observations with null values- use of Regex
-df['TotalCharges'] = df['TotalCharges'].replace(' ', np.nan)
-
-print(df.dropna(inplace=True))
-
-# data overview
-print('Rows     : ', df.shape[0])
-print('Columns  : ', df.shape[1])
-print('\nFeatures : \n', df.columns.tolist())
-print('\nMissing values :  ', df.isnull().sum().values.sum())
-print('\nUnique values :  \n', df.nunique())
-df.info()
-df.isnull().sum()
-
-# drop the customerID column from the dataset as this is not required
-print(df.drop(columns='customerID', inplace=True))
-
-# unique elements of the PaymentMethod column
-print(df.PaymentMethod.unique())
-
-# Applying Regex to remove (automatic) from payment method names
-df['PaymentMethod'] = df['PaymentMethod'].str.replace(' (automatic)', '', regex=False)
-
-# Replace values for SeniorCitizen as a categorical feature
-df['SeniorCitizen'] = df['SeniorCitizen'].replace({1: 'Yes', 0: 'No'})
-
-# Data Visualisation
+num_cols = ['tenure', 'MonthlyCharges', 'TotalCharges']
+df[num_cols].describe()
 sns.set(style='whitegrid')
-sns.pairplot(df[['tenure', 'MonthlyCharges', 'TotalCharges', 'Churn']], hue='Churn', plot_kws=dict(alpha=.3), height=2, aspect=1.1)
+sns.pairplot(df[['tenure', 'MonthlyCharges', 'TotalCharges', 'Churn']], hue='Churn', plot_kws=dict(alpha=.3, edgecolor='none'), height=2, aspect=1.1)
+
+fig, ax = plt.subplots(1, 3, figsize=(15, 3))
+df[df.Churn == 'No'][num_cols].hist(bins=35, color='blue', alpha=0.5, ax=ax)
+df[df.Churn == 'Yes'][num_cols].hist(bins=35, color='orange', alpha=0.7, ax=ax)
+plt.legend(['No Churn', 'Churn'], shadow=True, loc=9)
+
+# scatterplot
+_, ax = plt.subplots(1, 2, figsize=(16, 6))
+sns.scatterplot(x="TotalCharges", y="tenure" , hue="Churn", data=df, ax=ax[0])
+sns.scatterplot(x="MonthlyCharges", y="tenure", hue="Churn", data=df, ax=ax[1])
+
+# Facegrid
+facet = sns.FacetGrid(df, hue="Churn", aspect = 3)
+facet.map(sns.kdeplot, "TotalCharges", shade=True)
+facet.set(xlim=(0, df["TotalCharges"].max()))
+facet.add_legend()
+
+facet = sns.FacetGrid(df, hue="Churn", aspect=3)
+facet.map(sns.kdeplot, "MonthlyCharges", shade=True)
+facet.set(xlim=(0, df["MonthlyCharges"].max()))
+facet.add_legend()
+
+# Counter plot
+_, axs = plt.subplots(1, 2, figsize=(9, 6))
+plt.subplots_adjust(wspace=0.3)
+ax = sns.countplot(data=df, x="SeniorCitizen", hue="Churn", ax=axs[0])
+ax1 = sns.countplot(data=df, x="MultipleLines", hue="Churn", ax=axs[1])
+
+for p in ax.patches:
+    height = p.get_height()
+    ax.text(
+        p.get_x() + p.get_width() / 2,
+        height + 3.4,
+        "{:1.2f}%".format(height / len(df), 0),
+        ha="center", rotation=0
+    )
+
+for p in ax1.patches:
+    height = p.get_height()
+    ax1.text(
+        p.get_x() + p.get_width() / 2,
+        height + 3.4,
+        "{:1.2f}%".format(height / len(df), 0),
+        ha="center", rotation=0
+    )
+
 
 # Create a figure
 fig = plt.figure(figsize=(10, 6))
@@ -113,25 +196,15 @@ spine_names = ('top', 'right', 'bottom', 'left')
 for spine_name in spine_names:
     ax.spines[spine_name].set_visible(False)
     plt.show()
-sns.displot()
 
 # unique elements of the PaymentMethod column after the modification
 print(df.PaymentMethod.unique())
 
 
 def percentage_stacked_plot(columns_to_plot, super_title):
-    """
-    Prints a 100% stacked plot of the response variable for independent variable of the list columns_to_plot.
-            Parameters:
-                    columns_to_plot (list of string): Names of the variables to plot
-                    super_title (string): Super title of the visualization
-            Returns:
-                    None
-    """
 
     number_of_columns = 2
     number_of_rows = math.ceil(len(columns_to_plot) / 2)
-
     # create a figure
     fig = plt.figure(figsize=(12, 5 * number_of_rows))
     fig.suptitle(super_title, fontsize=22, y=.95)
@@ -181,16 +254,6 @@ percentage_stacked_plot(account_columns, 'Customer Account Information')
 
 
 def histogram_plots(columns_to_plot, super_title):
-    '''
-    Prints a histogram for each independent variable of the list columns_to_plot.
-
-           Parameters:
-                   columns_to_plot (list of string): Names of the variables to plot
-                   super_title (string): Super title of the visualization
-
-           Returns:
-                   None
-   '''
     # set number of rows and number of columns
 
     number_of_columns = 2
@@ -245,7 +308,6 @@ percentage_stacked_plot(services_columns, 'Services Information')
 # function that computes the mutual infomation score between a categorical series and the column Churn
 def compute_mutual_information(categorical_serie):
     return mutual_info_score(categorical_serie, df.Churn)
-
 
 # select categorial variables excluding the response variable
 categorical_variables = df.select_dtypes(include=object).drop('Churn', axis=1)
@@ -305,22 +367,17 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.25,
 
 
 def create_models(seed=2):
-    '''
-    Create a list of machine learning models.
-            Parameters:
-                    seed (integer): random seed of the models
-            Returns:
-                    models (list): list containing the models
-    '''
-
     models = []
     models.append(('dummy_classifier', DummyClassifier(random_state=seed, strategy='most_frequent')))
-    models.append(('k_nearest_neighbors', KNeighborsClassifier()))
-    models.append(('logistic_regression', LogisticRegression(random_state=seed, solver='lbfgs', max_iter=1000)))
+    models.append(('SVC', SVC(kernel='linear', random_state=0)))
+    models.append(('Kernel SVM', SVC(kernel='rbf', random_state=0)))
+    models.append(('k_nearest_neighbors', KNeighborsClassifier(n_neighbors=5, metric='minkowski', p=2)))
+    models.append(('logistic_regression', LogisticRegression(solver='liblinear', random_state=0, class_weight='balanced')))
     models.append(('support_vector_machines', SVC(random_state=seed)))
     models.append(('random_forest', RandomForestClassifier(random_state=seed)))
     models.append(('gradient_boosting', GradientBoostingClassifier(random_state=seed)))
-
+    models.append(('DecisionTreeClassifier', DecisionTreeClassifier(criterion='entropy', random_state=0)))
+    models.append(('Gaussian NB', GaussianNB()))
     return models
 
 
@@ -368,14 +425,27 @@ random_search_predictions = random_search.predict(X_test)
 
 # construct the confusion matrix
 confusion_matrix = confusion_matrix(y_test, random_search_predictions)
-
-
+df_cm = pd.DataFrame(confusion_matrix, index=(0, 1), columns=(0, 1))
+plt.figure(figsize=(28, 20))
+fig, ax = plt.subplots()
+sns.set(font_scale=1.4)
+sns.heatmap(df_cm, annot=True, fmt='g')
+class_names = [0, 1];
+tick_marks = np.arange(len(class_names));
+plt.tight_layout();
+plt.title('Confusion matrix\n', y=1.1);
+plt.xticks(tick_marks, class_names);
+plt.yticks(tick_marks, class_names);
+ax.xaxis.set_label_position("top");
+plt.ylabel('Actual label\n');
+plt.xlabel('Predicted label\n');
 # visualize the confusion matrix
-print('confusion_matrix', confusion_matrix)
-
+print('confusion_matrix', confusion_matrix);
+print("Test Data Accuracy: %0.4f" % accuracy_score(y_test, random_search_predictions));
 
 # print classification report
 
 print('classification report', classification_report(y_test, random_search_predictions))
 # print the accuracy of the model
 print(' accuracy of the model', accuracy_score(y_test, random_search_predictions))
+

@@ -1,30 +1,225 @@
-
+# 1. Data Preprocessing
+# Step 1: Import relevant libraries:
+# Standard libraries for data analysis:
 import math
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
+
+# sklearn modules for data preprocessing:
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
+
+import matplotlib.ticker as mtick
+
+# sklearn modules for Model Selection:
 from sklearn.dummy import DummyClassifier
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
-from sklearn.model_selection import train_test_split, RandomizedSearchCV
+from sklearn.model_selection import RandomizedSearchCV
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.linear_model import LogisticRegression
+
+# sklearn modules for Model Evaluation & Improvement:
 from sklearn.metrics import accuracy_score, classification_report, mutual_info_score
+
 from sklearn.svm import SVC
 from sklearn.metrics import confusion_matrix
-import re
 
 
-# Data Reading
+# Step 2: Import the dataset:
 df = pd.read_csv('customer-churn-data.csv')
 
-# Exploratory Data Analysis and Data Cleaning
+# Step 3: Evaluate data structure
 
 #  Retrieving data heads
 print(df.head)
 
 # Retrieving data columns
 print(df.columns)
+
+# summary of the data frame
+print(df.describe())
+print(df.info())
+print(df.dtypes)
+
+# Re-validate column data types and missing values:
+print(df.columns.to_series().groupby(df.dtypes).groups)
+
+# isna any
+print(df.isna().any())
+print(df.isnull().sum())
+
+# Identify unique values
+
+# Unique values in each categorical variable:
+df["PaymentMethod"].nunique()
+df["PaymentMethod"].unique()
+df["Contract"].nunique()
+df["Contract"].unique()
+
+# Step 4: Check target variable distribution:
+
+df["Churn"].value_counts()
+
+
+# Step 5: Clean the dataset:
+
+# Transform the column TotalCharges into a numeric data type
+
+df['TotalCharges'] = pd.to_numeric(df['TotalCharges'], errors='coerce')
+df['TotalCharges'] = df['TotalCharges'].astype("float")
+
+# Null observations of the TotalCharges column
+print(df[df['TotalCharges'].isnull()])
+
+# Drop observations with null values- use of Regex
+df['TotalCharges'] = df['TotalCharges'].replace(' ', np.nan)
+
+
+# Step 6: Take care of missing data:
+#print(df.isna().any())
+#print(df.dropna(inplace=True))
+
+# data overview
+#print('Rows     : ', df.shape[0])
+#print('Columns  : ', df.shape[1])
+#print('\nFeatures : \n', df.columns.tolist())
+#print('\nMissing values :  ', df.isnull().sum().values.sum())
+#print('\nUnique values :  \n', df.nunique())
+#print(df.info())
+#print(df.isnull().sum())
+
+# Drop the customerID column from the dataset as this is not required
+
+# print(df.drop(columns='customerID', inplace=True))
+
+# Unique elements of the PaymentMethod column
+print(df.PaymentMethod.unique())
+
+# Applying Regex to remove (automatic) from payment method names
+df['PaymentMethod'] = df['PaymentMethod'].str.replace(' (automatic)', '', regex=True)
+
+# Replace values for SeniorCitizen as a categorical feature
+df['SeniorCitizen'] = df['SeniorCitizen'].replace({'1': 'Yes', '0': 'No'})
+
+# Revalidate NA’s:
+print(df.isna().any())
+
+
+# 2. Data Evaluation
+
+# Step 7: Exploratory Data Analysis:
+
+# Step 7.1. Plot histogram of numeric Columns:
+df2 = df[['gender', 'SeniorCitizen', 'Partner', 'Dependents', 'tenure', 'PhoneService', 'PaperlessBilling',
+                    'MonthlyCharges', 'TotalCharges']]
+# Histogram:
+
+fig = plt.figure(figsize=(15, 12))
+plt.suptitle('Histograms of Numerical Columns\n', horizontalalignment="center", fontstyle="normal", fontsize=24,
+             fontfamily="sans-serif")
+for i in range(df2.shape[1]):
+    plt.subplot(6, 3, i + 1)
+    f = plt.gca()
+    f.set_title(df2.columns.values[i])
+
+vals = np.size(df2.iloc[:, i].unique())
+if vals >= 100:
+    vals = 100
+
+plt.hist(df2.iloc[:, i], bins=vals, color='#ec838a')
+plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+
+
+# Step 7.2. Analyze the distribution of categorical variables:
+
+contract_split = df[["customerID", "Contract"]]
+sectors = contract_split.groupby("Contract")
+contract_split = pd.DataFrame(sectors["customerID"].count())
+contract_split.rename(columns={'customerID': 'No. of customers'}, inplace=True)
+ax = contract_split[["No. of customers"]].plot.bar(title='Customers by Contract Type', legend=True, table=False,
+                                                   grid=False, subplots=False, figsize=(12, 7), color='#ec838a',
+                                                   fontsize=15, stacked=False)
+plt.ylabel('No. of Customers\n',
+           horizontalalignment="center", fontstyle="normal",
+           fontsize="large", fontfamily="sans-serif")
+plt.xlabel('\n Contract Type',
+           horizontalalignment="center", fontstyle="normal",
+           fontsize="large", fontfamily="sans-serif")
+plt.title('Customers by Contract Type \n',
+          horizontalalignment="center", fontstyle="normal",
+          fontsize="22", fontfamily="sans-serif")
+plt.legend(loc='upper right', fontsize="medium")
+plt.xticks(rotation=0, horizontalalignment="center")
+plt.yticks(rotation=0, horizontalalignment="right")
+x_labels = np.array(contract_split[["No. of customers"]])
+
+
+def add_value_labels(ax, spacing=5):
+    for rect in ax.patches:
+        y_value = rect.get_height()
+        x_value = rect.get_x() + rect.get_width() / 2
+        space = spacing
+        va = 'bottom'
+        if y_value < 0:
+            space *= -1
+            va = 'top'
+        label = "{:.0f}".format(y_value)
+
+        ax.annotate(
+            label,
+            (x_value, y_value),
+            xytext=(0, space),
+            textcoords="offset points",
+            ha='center',
+            va=va)
+
+
+add_value_labels(ax)
+
+# Step 7.3 Distribution of payment method type
+
+payment_method_split = df[["customerID", "PaymentMethod"]]
+sectors = payment_method_split.groupby("PaymentMethod")
+payment_method_split = pd.DataFrame(sectors["customerID"].count())
+payment_method_split.rename(columns={'customerID': 'No. of customers'}, inplace=True)
+ax = payment_method_split[["No. of customers"]].plot.bar(title='Customers by Payment Method', legend=True, table=False,
+                                                         grid=False, subplots=False, figsize=(15, 10), color='#ec838a',
+                                                         fontsize=15, stacked=False)
+plt.ylabel('No. of Customers\n',
+           horizontalalignment="center", fontstyle="normal",
+           fontsize="large", fontfamily="sans-serif")
+plt.xlabel('\n Contract Type',
+           horizontalalignment="center", fontstyle="normal",
+           fontsize="large", fontfamily="sans-serif")
+plt.title('Customers by Payment Method \n',
+          horizontalalignment="center", fontstyle="normal", fontsize="22", fontfamily="sans-serif")
+plt.legend(loc='upper right', fontsize="medium")
+plt.xticks(rotation=0, horizontalalignment="center")
+plt.yticks(rotation=0, horizontalalignment="right")
+x_labels = np.array(payment_method_split[["No. of customers"]])
+
+
+def add_value_labels(ax, spacing=5):
+    for rect in ax.patches:
+        y_value = rect.get_height()
+        x_value = rect.get_x() + rect.get_width() / 2
+        space = spacing
+        va = 'bottom'
+        if y_value < 0:
+            space *= -1
+            va = 'top'
+        label = "{:.0f}".format(y_value)
+
+        ax.annotate(label,
+                    (x_value, y_value),
+                    xytext=(0, space), textcoords="offset points",
+                    ha='center', va=va)
+
+
+add_value_labels(ax)
+
 
 # Quantitative features:
 features = ['MonthlyCharges', 'tenure']
@@ -38,51 +233,14 @@ sns.distplot(x)
 
 # Box plot
 
-sns.boxplot(x='MonthlyCharges', data=df);
+_, axes = plt.subplots(1, 2, sharey=True, figsize=(10, 4))
+
+sns.boxplot(x='Churn', y='MonthlyCharges', data=df, ax=axes[0])
 
 # Violin plot
-
-_, axes = plt.subplots(1, 2, sharey=True, figsize=(6, 4))
-sns.boxplot(data=df['MonthlyCharges'], ax=axes[0])
-sns.violinplot(data=df['MonthlyCharges'], ax=axes[1])
-
-# summary of the data frame
-print(df.info())
-
-# Data Cleaning, Missing values and data types
-# Transform the column TotalCharges into a numeric data type
-df['TotalCharges'] = pd.to_numeric(df['TotalCharges'], errors='coerce')
-
-df.isnull().sum()
-# Null observations of the TotalCharges column
-print(df[df['TotalCharges'].isnull()])
-
-# Drop observations with null values- use of Regex
-df['TotalCharges'] = df['TotalCharges'].replace(' ', np.nan)
-
-print(df.dropna(inplace=True))
-
-# data overview
-print('Rows     : ', df.shape[0])
-print('Columns  : ', df.shape[1])
-print('\nFeatures : \n', df.columns.tolist())
-print('\nMissing values :  ', df.isnull().sum().values.sum())
-print('\nUnique values :  \n', df.nunique())
-print(df.info())
-print(df.isnull().sum())
-
-# drop the customerID column from the dataset as this is not required
-print(df.drop(columns='customerID', inplace=True))
-
-# unique elements of the PaymentMethod column
-print(df.PaymentMethod.unique())
-
-# Applying Regex to remove (automatic) from payment method names
-df['PaymentMethod'] = df['PaymentMethod'].str.replace(' (automatic)', '', regex=True)
+sns.violinplot(x='Churn', y='MonthlyCharges', data=df, ax=axes[1])
 
 
-# Replace values for SeniorCitizen as a categorical feature
-df['SeniorCitizen'] = df['SeniorCitizen'].replace({'1': 'Yes', '0': 'No'})
 
 # Data Visualisation
 num_cols = ['tenure', 'MonthlyCharges', 'TotalCharges']
@@ -90,92 +248,78 @@ df[num_cols].describe()
 sns.set(style='whitegrid')
 sns.pairplot(df[['tenure', 'MonthlyCharges', 'TotalCharges', 'Churn']], hue='Churn', plot_kws=dict(alpha=.3, edgecolor='none'), height=2, aspect=1.1)
 
-
 fig, ax = plt.subplots(1, 3, figsize=(15, 3))
 df[df.Churn == 'No'][num_cols].hist(bins=35, color='blue', alpha=0.5, ax=ax)
 df[df.Churn == 'Yes'][num_cols].hist(bins=35, color='orange', alpha=0.7, ax=ax)
 plt.legend(['No Churn', 'Churn'], shadow=True, loc=9)
 
-# Create a figure
+# create a figure
 fig = plt.figure(figsize=(10, 6))
 ax = fig.add_subplot(111)
 
-# Proportion of observation of each class, normalization
+# proportion of observation of each class
 prop_response = df['Churn'].value_counts(normalize=True)
 
-# Create a bar plot showing the percentage of churn
+# create a bar plot showing the percentage of churn
 prop_response.plot(kind='bar',
                    ax=ax,
-                   color=['cyan', 'yellow'])
+                   color=['cyan', 'salmon'])
 
-# Set title and labels
+# set title and labels
 ax.set_title('Proportion of observations of the response variable',
-             fontsize=20, loc='left')
-ax.set_xlabel('Churn',
-              fontsize=18)
-ax.set_ylabel('Proportion of observations',
-              fontsize=18)
+             fontsize=18, loc='left')
+ax.set_xlabel('churn',
+              fontsize=14)
+ax.set_ylabel('proportion of observations',
+              fontsize=14)
 ax.tick_params(rotation='auto')
 
 # eliminate the frame from the plot
 spine_names = ('top', 'right', 'bottom', 'left')
 for spine_name in spine_names:
     ax.spines[spine_name].set_visible(False)
-    plt.show()
-
-# unique elements of the PaymentMethod column after the modification
-print(df.PaymentMethod.unique())
 
 
-def percentage_stacked_plot(columns_to_plot, super_title):
-    """
-    Prints a 100% stacked plot of the response variable for independent variable of the list columns_to_plot.
-            Parameters:
-                    columns_to_plot (list of string): Names of the variables to plot
-                    super_title (string): Super title of the visualization
-            Returns:
-                    None
-    """
+    def percentage_stacked_plot(columns_to_plot, super_title):
+        number_of_columns = 2
+        number_of_rows = math.ceil(len(columns_to_plot) / 2)
 
-    number_of_columns = 2
-    number_of_rows = math.ceil(len(columns_to_plot) / 2)
+        # create a figure
+        fig = plt.figure(figsize=(12, 5 * number_of_rows))
+        fig.suptitle(super_title, fontsize=22, y=.95)
 
-    # create a figure
-    fig = plt.figure(figsize=(12, 5 * number_of_rows))
-    fig.suptitle(super_title, fontsize=22, y=.95)
+        # loop to each column name to create a subplot
+        for index, column in enumerate(columns_to_plot, 1):
 
-    # loop to each column name to create a subplot
-    for index, column in enumerate(columns_to_plot, 1):
+            # create the subplot
+            ax = fig.add_subplot(number_of_rows, number_of_columns, index)
 
-        # create the subplot
-        ax = fig.add_subplot(number_of_rows, number_of_columns, index)
+            # calculate the percentage of observations of the response variable for each group of the independent variable
+            # 100% stacked bar plot
+            prop_by_independent = pd.crosstab(df[column], df['Churn']).apply(lambda x: x / x.sum() * 100,
+                                                                                         axis=1)
 
-        # calculate the percentage of observations of the response variable for each group of the independent variable
-        # 100% stacked bar plot
-        prop_by_independent = pd.crosstab(df[column], df['Churn']).apply(lambda x: x / x.sum() * 100,
-                                                                         axis=1)
+            prop_by_independent.plot(kind='bar', ax=ax, stacked=True,
+                                     rot=0, color=['springgreen', 'salmon'])
 
-        prop_by_independent.plot(kind='bar', ax=ax, stacked=True,
-                                 rot=0, color=['springgreen', 'salmon'])
+            # set the legend in the upper right corner
+            ax.legend(loc="upper right", bbox_to_anchor=(0.62, 0.5, 0.5, 0.5),
+                      title='Churn', fancybox=True)
 
-        # set the legend in the upper right corner
-        ax.legend(loc="upper right", bbox_to_anchor=(0.62, 0.5, 0.5, 0.5),
-                  title='Churn', fancybox=True)
+            # set title and labels
+            ax.set_title('Proportion of observations by ' + column,
+                         fontsize=16, loc='left')
 
-        # set title and labels
-        ax.set_title('Proportion of observations by ' + column,
-                     fontsize=16, loc='left')
+            ax.tick_params(rotation='auto')
 
-        ax.tick_params(rotation='auto')
-
-        # eliminate the frame from the plot
-        spine_names = ('top', 'right', 'bottom', 'left')
-        for spine_name in spine_names:
-            ax.spines[spine_name].set_visible(False)
-
+            # eliminate the frame from the plot
+            spine_names = ('top', 'right', 'bottom', 'left')
+            for spine_name in spine_names:
+                ax.spines[spine_name].set_visible(False)
     plt.show()
 # demographic column names
 
+# demographic column names
 demographic_columns = ['gender', 'SeniorCitizen', 'Partner', 'Dependents']
 
 # stacked plot of demographic columns
@@ -189,16 +333,7 @@ percentage_stacked_plot(account_columns, 'Customer Account Information')
 
 
 def histogram_plots(columns_to_plot, super_title):
-    '''
-    Prints a histogram for each independent variable of the list columns_to_plot.
 
-           Parameters:
-                   columns_to_plot (list of string): Names of the variables to plot
-                   super_title (string): Super title of the visualization
-
-           Returns:
-                   None
-   '''
     # set number of rows and number of columns
 
     number_of_columns = 2
@@ -216,9 +351,9 @@ def histogram_plots(columns_to_plot, super_title):
 
         # histograms for each class (normalized histogram)
         df[df['Churn'] == 'No'][column].plot(kind='hist', ax=ax, density=True,
-                                             alpha=0.5, color='springgreen', label='No')
+                                             alpha=0.5, color='cyan', label='No')
         df[df['Churn'] == 'Yes'][column].plot(kind='hist', ax=ax, density=True,
-                                              alpha=0.5, color='salmon', label='Yes')
+                                              alpha=0.5, color='yellow', label='Yes')
 
 
         # set the legend in the upper right corner
@@ -251,9 +386,9 @@ percentage_stacked_plot(services_columns, 'Services Information')
 
 
 # function that computes the mutual infomation score between a categorical series and the column Churn
+
 def compute_mutual_information(categorical_serie):
     return mutual_info_score(categorical_serie, df.Churn)
-
 
 # select categorial variables excluding the response variable
 categorical_variables = df.select_dtypes(include=object).drop('Churn', axis=1)
@@ -336,12 +471,15 @@ def create_models(seed=2):
 models = create_models()
 
 # test the accuracy of each model using default hyperparameters
+
 results = []
 names = []
 scoring = 'accuracy'
 for name, model in models:
     # fit the model with the training data
     model.fit(X_train, y_train).predict(X_test)
+
+
     # make predictions with the testing data
     predictions = model.predict(X_test)
     # calculate accuracy
@@ -349,8 +487,11 @@ for name, model in models:
     # append the model name and the accuracy to the lists
     results.append(accuracy)
     names.append(name)
+
     # print classifier accuracy
     print('Classifier: {}, Accuracy: {})'.format(name, accuracy))
+
+
 
 # define the parameter grid
 grid_parameters = {'n_estimators': [80, 90, 100, 110, 115, 120],
